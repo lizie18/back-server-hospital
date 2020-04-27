@@ -25,8 +25,8 @@ const getUsersList = async (req, res, next) => {
 const createUser = async (req, res, next) => {
 	const body = req.body;
 	const { error } = validationToCreate(body);
-	if (error) next({ message: error.details[0].message, status: 400 });
-
+	// if (error) return res.status(400).send(error.details[0].message)
+	if (error) return next({ message: error.details[0].message, status: 400 });
 	const user = new User({
 		name: body.name,
 		email: body.email,
@@ -38,10 +38,7 @@ const createUser = async (req, res, next) => {
 		const userSaved = await user.save();
 		res.status(201).send({user: userSaved._id});
 	} catch (error) {
-		error.status = 400;
-		// // err.message = err.errors
-		next(error)
-		// res.status(400).send(err)
+		next({ message: error.message, status: 400 })
 	}
 }
 
@@ -53,13 +50,13 @@ const updateUser = async (req, res, next) => {
 	const body = req.body;
 
 	// Validar si ID es válido y si existe en la BD
-	if (!mongoose.Types.ObjectId.isValid(id)) next({message:'ID inválido.', status: 400});
+	if (!mongoose.Types.ObjectId.isValid(id)) return next({message:'ID inválido.', status: 400});
 	const userToUpdate = await User.findOne({_id: id});
-	if (!userToUpdate) next({message: `No existe usuario con ID ${id}`, status: 400 })
+	if (!userToUpdate) return next({message: `No existe usuario con ID ${id}`, status: 400 })
 
 	// Validar la data recibida
 	const { error } = validationToUpdate(body);
-	if (error) next({ message: error.details[0].message, status: 400 });
+	if (error) return next({ message: error.details[0].message, status: 400 });
 
 	userToUpdate.name = body.name;
 	userToUpdate.email = body.email;
@@ -69,20 +66,19 @@ const updateUser = async (req, res, next) => {
 		const updatedUser = await userToUpdate.save();
 		res.send({ userUpdated: updatedUser._id })
 	} catch(error) {
-		error.status = 400;
-		next(error)
+		next({ message: error.message, status: 400 })
 	}
 }
 
 // =======================================================================
-// Elimiar usuario
+// Eliminar usuario
 // =======================================================================
 const deleteUser = async (req, res, next) => {
 	const id = req.params.id;
-	if (!mongoose.Types.ObjectId.isValid(id)) next({ message: 'ID inválido.', status: 400 });
+	if (!mongoose.Types.ObjectId.isValid(id)) return next({ message: 'ID inválido.', status: 400 });
 	try {
 		const deletedUser = await User.findByIdAndRemove(id);
-		if (!deletedUser) next({ message: `No existe usuario con ID ${id}`, status: 400 })
+		if (!deletedUser) return next({ message: `No existe usuario con ID ${id}`, status: 400 })
 		res.send({userDeleted: deletedUser._id})
 	} catch (error) {
 		next(error)

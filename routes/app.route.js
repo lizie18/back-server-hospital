@@ -1,4 +1,4 @@
-var express = require('express');
+const express = require('express');
 const Router = express.Router();
 
 // Importación de Rutas
@@ -21,11 +21,3 @@ let API_ROUTER = Router
 .use("/img", imgRoutes)
 
 module.exports = API_ROUTER;
-
-// var app = express();
-// app.get('/', (req, res, next) => {
-//     res.status(200).json({
-//         ok: true,
-//         menssage: 'Petición ejecutada correctamente'
-//     })
-// });

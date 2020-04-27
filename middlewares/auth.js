@@ -1,7 +1,7 @@
-var jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 
 exports.verifyToken = async (req, res, next) => {
-	var token = await req.headers.authorization;
+	const token = await req.headers.authorization;
 
 	if (!token) {
 		next({message: 'No se proporcionado la autenticación requerida.', status: 401})

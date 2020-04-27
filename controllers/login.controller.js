@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const client = new OAuth2Client(CLIENT_ID);
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.G_CLIENT_ID);
 const User = require('../models/user.model');
-
 
 // =======================================================================
 // Login
@@ -27,8 +27,8 @@ const login = async (req, res, next) => {
 async function verify(token) {
 	const ticket = await client.verifyIdToken({
 		idToken: token,
-		audience: CLIENT_ID
-	});
+		audience: process.env.G_CLIENT_ID
+	})
 	const payload = ticket.getPayload();
 	return {
 		name: payload.name,
@@ -38,78 +38,44 @@ async function verify(token) {
 	}
 }
 // =======================================================================
-// Login with Google
+// Login con Google
 // =======================================================================
-const googleLogin = async (req, res) => {
-	const token = req.body.gtoken
-	const googleUser = await verify(token)
-		.catch(err => {
-			return res.status(400).json({
-				ok: false,
-				message: "El token es inválido",
-				err
-			});
-		})
+const googleLogin = async (req, res, next) => {
+	const token = req.body.gtoken;
 
-	User.findOne({ email: googleUser.email }, (err, userRegistered) => {
-		if (err) {
-			return res.status(500).json({
-				ok: false,
-				message: "Error buscando usuario",
-				err
-			});
+	// Validar cuenta google
+	let googleUser = await verify(token).catch(e => { return 'Error' });
+	if (googleUser === 'Error') return next({ message: 'Token incorrecto', status: 400 })
+
+	// Validar si existe usuario en la DB
+	let loginUser = await User.findOne({ email: googleUser.email });
+	if (loginUser && !loginUser.google) {
+		return next({ message: 'El usuario no está registrado con Google Authentication', status: 400 })
+	}
+
+	// Crear usuario
+	if (!loginUser) {
+		const user = new User();
+
+		user.name = googleUser.name;
+		user.email = googleUser.email;
+		user.img = googleUser.img;
+		user.google = true;
+		user.password = ':)'
+
+		try {
+			loginUser = await user.save();
+		} catch (error) {
+			next({ message: error.message, status: 400 })
 		}
-
-		if (userRegistered) {
-			if (!userRegistered.google) {
-				return res.status(400).json({
-					ok: false,
-					message: "El usuario no ha sido registrado mendiante Google Authentication",
-					err: { message: "El usuario no ha sido registrado mendiante Google Authentication" },
-				});
-			} else {
-				var token = jwt.sign({ user: userRegistered }, SEED, { expiresIn: 14400 }); // 4 horas
-				res.status(200).json({
-					ok: true,
-					user: userRegistered,
-					message: "Login correcto",
-					token,
-					id: userRegistered._id,
-				});
-			}
-		} else {
-			const user = new User();
-			user.name = googleUser.name;
-			user.email = googleUser.email;
-			user.img = googleUser.img;
-			user.google = true;
-			user.password = ':)'
-
-			user.save((err, userSaved) => {
-				if (err) {
-					return res.status(400).json({
-						ok: false,
-						message: "No se pudo guardar el usuario",
-						googleUser,
-						user,
-						err,
-					});
-				}
-				var token = jwt.sign({ user: userSaved }, SEED, { expiresIn: 14400 }); // 4 horas
-				res.status(200).json({
-					ok: true,
-					user: userSaved,
-					message: "Usuario creado y Login correcto",
-					token,
-					id: userSaved._id,
-				});
-			})
-		}
-	});
+	}
+	try {
+		const token = jwt.sign({ user: loginUser }, process.env.SEED_TOKEN, { expiresIn: 14400 }); // 4 horas
+		res.send({ user: loginUser._id, token: token })
+	} catch (error) {
+		next(error)
+	}
 }
-
-
-
 
 module.exports.login = login;
 module.exports.googleLogin = googleLogin;
